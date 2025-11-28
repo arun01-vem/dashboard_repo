@@ -3,22 +3,43 @@ import pandas as pd
 import plotly.express as px
 import numpy as np
 
-# --- 1. DATA GENERATION (Simulating your EXACT columns) ---
-@st.cache_data
-def load_data():
-    # A. VOTER DATA (4k rows)
-    np.random.seed(42)
-    n_voters = 4000
+# --- 1. DATA GENERATION (CSV reading helpers) ---
 
+# Cached helper that only reads local file paths. NOTE: this function does
+# NOT include any Streamlit widgets so it is safe to cache.
+@st.cache_data
+def _read_local_csvs(voters_path: str, history_path: str):
+    df_voters = pd.read_csv(voters_path)
+    df_history_raw = pd.read_csv(history_path)
+
+    # Normalize column name if present
+    if 'Ward_No' in df_history_raw.columns and 'ward_no' not in df_history_raw.columns:
+        df_history_raw = df_history_raw.rename(columns={'Ward_No': 'ward_no'})
+
+    return df_voters, df_history_raw
+
+
+def load_data():
+    """
+    Load voter and history CSVs. Widgets (file uploaders) are executed
+    at top-level here (not inside a cached function) to avoid
+    Streamlit CachedWidgetWarning when deployed.
+
+    Behavior:
+    - Try to read the local absolute paths using the cached helper.
+    - If local files are not available, show `st.file_uploader` widgets
+      (outside cache) and read uploaded files directly (no caching).
+    """
     # Prefer local relative files (place CSVs next to this script). If not found,
     # show Streamlit upload widgets so the user can upload files through the app.
-    local_voters_path = 'voters_filtereddata - Sheet1 (1).csv'
-    local_history_path = 'voters_data - Sheet2.csv'
+    local_voters_abs = r"C:\Users\LENOVO\Desktop\deploy\voters_filtereddata - Sheet1 (1).csv"
+    local_history_abs = r"C:\Users\LENOVO\Desktop\deploy\voters_data - Sheet2.csv"
 
     try:
-        df_voters = pd.read_csv(r"C:\Users\LENOVO\Desktop\deploy\voters_filtereddata - Sheet1 (1).csv")
-        df_history_raw = pd.read_csv(r"C:\Users\LENOVO\Desktop\deploy\voters_data - Sheet2.csv")
-    except FileNotFoundError:
+        # Use the cached reader for local files only
+        df_voters, df_history_raw = _read_local_csvs(local_voters_abs, local_history_abs)
+    except Exception:
+        # Local files not available — perform uploads at top-level (not cached)
         st.warning('Local CSV files not found. Please upload them below or place them next to this script.')
         uploaded_voters = st.file_uploader('Upload `voters_filtereddata - Sheet1 (1).csv`', type=['csv'], key='voters')
         uploaded_history = st.file_uploader('Upload `voters_data - Sheet2.csv`', type=['csv'], key='history')
@@ -30,9 +51,9 @@ def load_data():
         df_voters = pd.read_csv(uploaded_voters)
         df_history_raw = pd.read_csv(uploaded_history)
 
-    # Rename 'Ward_No' to 'ward_no' for consistency with df_voters and process_history
-    if 'Ward_No' in df_history_raw.columns and 'ward_no' not in df_history_raw.columns:
-        df_history_raw = df_history_raw.rename(columns={'Ward_No': 'ward_no'})
+        # Normalize column name if present
+        if 'Ward_No' in df_history_raw.columns and 'ward_no' not in df_history_raw.columns:
+            df_history_raw = df_history_raw.rename(columns={'Ward_No': 'ward_no'})
 
     return df_voters, df_history_raw
 
@@ -183,6 +204,8 @@ else:
         category_orders={'Age_Group': ['18-28', '29-39', '40-59', '60+']}
     )
     voters_bar.update_layout(barmode='stack')
+    voters_bar.update_traces(textposition='outside', text=counts.groupby('Gender')['Count'].sum().values)
+    voters_bar.update_xaxes(type='category')
     st.plotly_chart(voters_bar, use_container_width=True)
 
 
@@ -271,7 +294,7 @@ try:
 except Exception:
     _have_mpl = False
 
-_cols = ['ward_no', 'Winner_Party', 'Win_Margin', 'Voters_In_Ward', 'Winner_Votes', 'Impact_Score', 'Winner_Name', 'RunnerUp_Name']
+_cols = ['ward_no', 'Winner_Party', 'Win_Margin', 'Voters_In_Ward', 'Winner_Votes', 'Winner_Name', 'RunnerUp_Name', 'RunnerUp_Votes', 'Impact_Score']
 if _have_mpl:
     st.dataframe(
         final_df[_cols].style.background_gradient(subset=['Impact_Score'], cmap="Reds"),
