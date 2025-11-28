@@ -194,17 +194,19 @@ else:
     counts['Age_Group'] = counts['Age_Group'].fillna('Unknown')
 
     # Create a stacked bar chart: x=Gender, y=Count, color=Age_Group
+    # Show each age-group segment's own count inside the segment and make bars thinner
     voters_bar = px.bar(
         counts,
         x='Gender',
         y='Count',
         color='Age_Group',
+        text='Count',
         title=f"Voter Counts by Gender (filtered by Age/Ward)",
         labels={'Count': 'Number of Voters', 'Gender': 'Gender', 'Age_Group': 'Age Group'},
         category_orders={'Age_Group': ['18-28', '29-39', '40-59', '60+']}
     )
-    voters_bar.update_layout(barmode='stack')
-    voters_bar.update_traces(textposition='outside', text=counts.groupby('Gender')['Count'].sum().values)
+    voters_bar.update_layout(barmode='stack', bargap=0.6)
+    voters_bar.update_traces(textposition='inside')
     voters_bar.update_xaxes(type='category')
     st.plotly_chart(voters_bar, use_container_width=True)
 
